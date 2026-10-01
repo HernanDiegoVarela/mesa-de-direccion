@@ -510,7 +510,7 @@ function vistaIdeas() {
         <div class="t">${esc(t.tema)}</div>
         ${t.detalle ? `<div class="det">${esc(t.detalle)}</div>` : ''}
         <div class="meta"><span>Anotada el ${fmt(t.fechaCarga)}</span><span class="${n > 14 ? 'vencida' : ''}">${n === 0 ? 'Cargada hoy' : 'Esperando ' + n + (n === 1 ? ' día' : ' días')}</span></div>
-        <button class="btn pri" data-act="mesa" data-id="${esc(t.id)}">Tratar en la Mesa</button>
+        ${S.rol === 'CEO' ? `<button class="btn pri" data-act="mesa" data-id="${esc(t.id)}">Tratar en la Mesa</button>` : '<div class="nota">Se trata en la Mesa con el CEO</div>'}
       </div>`;
     }).join('') : '<div class="vacio">No hay ideas esperando. Bandeja al día.</div>'}</div>
   </section>`;
@@ -663,7 +663,7 @@ async function guardarIdea() {
 // Detalle de un tema
 function abrirDetalle(id) {
   const t = S.temas.find(x => x.id === id); if (!t) return;
-  if (t.etapa === 'Idea') return abrirMesa(id);
+  if (t.etapa === 'Idea') { if (S.rol === 'CEO') abrirMesa(id); return; }
   const coo = S.rol === 'COO';
   form = { id, avance: t.avance };
   const etiqueta = t.etapa === 'Tarea' ? t.cuadrante : 'Archivada';
@@ -683,17 +683,19 @@ function abrirDetalle(id) {
       <div class="seg seg5" id="segAv">${AVANCES.map(a => `<button type="button" class="${a === t.avance ? 'on' : ''}" ${coo ? `data-act="setAv" data-v="${a}"` : 'disabled'}>${a}</button>`).join('')}</div>
       <label class="l" for="fCom">Comentario del COO</label>
       ${coo ? `<textarea class="in" id="fCom" placeholder="¿Cómo viene este tema?">${esc(t.comentario)}</textarea>`
-            : `<div class="leer">${t.comentario ? esc(t.comentario) : '<em>Sin comentarios todavía</em>'}</div>`}` : ''}
+            : `<div class="leer">${t.comentario ? esc(t.comentario) : '<em>Sin comentarios todavía</em>'}</div>`}
+      ${coo && t.cuadrante === 'Delegar' ? `<label class="l" for="fResp">¿A quién se delegó?</label><input class="in" id="fResp" value="${esc(t.responsable)}" placeholder="Nombre o área">` : ''}` : ''}
     <div class="acciones">
       ${coo && t.etapa === 'Tarea' ? '<button class="btn pri" data-act="guardarDet">Guardar avance</button>' : ''}
-      ${t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">Reclasificar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
-                            : `<button class="btn sec" data-act="reactivar" data-id="${esc(t.id)}">Volver a Ideas</button>`}
+      ${!coo ? (t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">Reclasificar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
+                                    : `<button class="btn sec" data-act="reactivar" data-id="${esc(t.id)}">Volver a Ideas</button>`) : ''}
       <button class="btn sec" data-act="cerrarModal">Cerrar</button>
     </div>`);
 }
 
 // Tratar en la Mesa / Reclasificar
 function abrirMesa(id) {
+  if (S.rol !== 'CEO') return;
   const t = S.temas.find(x => x.id === id); if (!t) return;
   const sug = sugerir(t.urgencia, t.importancia);
   form = { id, u: t.urgencia || '', i: t.importancia || '', cuad: t.cuadrante || '', manual: !!t.cuadrante && t.cuadrante !== sug, esIdea: t.etapa !== 'Tarea' };
@@ -771,7 +773,11 @@ const H = {
   mesaOk: () => mesaOk(),
   mesaArch: async () => { if (!confirm('¿Archivar esta idea? Queda guardada en el Archivo.')) return; if (await enviar('editarTema', { id: form.id, datos: { etapa: 'Archivada' } }, 'Idea archivada')) cerrarModal(); },
   setAv: el => { form.avance = el.dataset.v; document.querySelectorAll('#segAv button').forEach(b => b.classList.toggle('on', b.dataset.v === form.avance)); },
-  guardarDet: async () => { if (await enviar('editarTema', { id: form.id, datos: { avance: form.avance, comentario: $('#fCom').value.trim() } }, 'Avance actualizado')) cerrarModal(); },
+  guardarDet: async () => {
+    const datos = { avance: form.avance, comentario: $('#fCom').value.trim() };
+    if ($('#fResp')) datos.responsable = $('#fResp').value.trim();
+    if (await enviar('editarTema', { id: form.id, datos }, 'Avance actualizado')) cerrarModal();
+  },
   archivar: async el => { if (!confirm('¿Archivar este tema? Queda guardado en el Archivo.')) return; if (await enviar('editarTema', { id: el.dataset.id, datos: { etapa: 'Archivada' } }, 'Tema archivado')) cerrarModal(); },
   reactivar: async el => { if (await enviar('editarTema', { id: el.dataset.id, datos: { etapa: 'Idea' } }, 'Volvió a la bandeja de Ideas')) cerrarModal(); },
   agAlta: async () => { const i = $('#agTema'); const tema = i.value.trim(); if (!tema) { i.focus(); return; } await enviar('nuevoAgenda', { datos: { tema } }, 'Agregado a la agenda'); },
@@ -846,6 +852,7 @@ const Demo = (() => {
           const t = temas.find(z => z.id === x.id); if (!t) throw new Error('No encuentro el tema');
           Object.keys(x.datos).forEach(k => {
             if ((k === 'avance' || k === 'comentario') && rol !== 'COO') throw new Error('Solo el COO puede cambiar el avance');
+            if (k !== 'avance' && k !== 'comentario' && k !== 'responsable' && rol !== 'CEO') throw new Error('Solo el CEO puede clasificar');
             t[k] = x.datos[k] == null ? '' : x.datos[k];
           });
           if (t.etapa === 'Tarea') { if (!t.validacion) t.validacion = d(0); if (!t.avance) t.avance = 'Recibido'; }
