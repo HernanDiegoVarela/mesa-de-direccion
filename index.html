@@ -84,6 +84,8 @@ button.kpi:hover{border-color:var(--azul)}
 .chip.ok{background:#e2f1e4;color:#1c6a21}
 .chip.esp{background:#fff1cf;color:#865600}
 .chip.bloq{background:#fde3e3;color:#a41c1c}
+.chip.reas{background:#efe6fb;color:#5b2d9c}
+.reas-t{color:#5b2d9c}
 .vencida{color:var(--bad);font-weight:700}
 .vacio{color:var(--gris);font-style:italic;padding:10px 6px}
 
@@ -486,8 +488,13 @@ function card(t) {
     <div class="meta">${chipCoo(t)}${chipAvance(t)}
       <span>Abierto ${haceTxt(t.fechaCarga)}</span>
       ${t.limite ? `<span class="${v ? 'vencida' : ''}">${v ? '⚠ Vencida · ' : 'Límite '}${fmt(t.limite)}</span>` : ''}
-      ${t.responsable ? `<span>→ ${esc(t.responsable)}</span>` : ''}
+      ${respTxt(t)}
     </div></button>`;
+}
+function reasignado(t) { return !!t.responsableOp && t.responsableOp !== t.responsable; }
+function respTxt(t) {
+  if (reasignado(t)) return `<span class="chip reas">Reasignado</span><span>${t.responsable ? 'CEO: ' + esc(t.responsable) + ' → ' : ''}COO: ${esc(t.responsableOp)}</span>`;
+  return t.responsable ? `<span>→ ${esc(t.responsable)}</span>` : '';
 }
 function ordenar(l) {
   return l.slice().sort((a, b) => (a.limite || '9999').localeCompare(b.limite || '9999') || (a.fechaCarga || '').localeCompare(b.fechaCarga || ''));
@@ -683,7 +690,8 @@ function abrirDetalle(id) {
       <div><dt>Validado en Mesa</dt><dd>${fmt(t.validacion)}</dd></div>
       <div><dt>Urgencia / Importancia</dt><dd>${esc(t.urgencia || '—')} / ${esc(t.importancia || '—')}</dd></div>
       <div><dt>Arranque → Límite</dt><dd class="${vencida(t) ? 'vencida' : ''}">${fmt(t.inicio)} → ${fmt(t.limite)}</dd></div>
-      ${t.responsable ? `<div><dt>Responsable</dt><dd>${esc(t.responsable)}</dd></div>` : ''}
+      ${t.responsable ? `<div><dt>Responsable (definió el CEO)</dt><dd>${esc(t.responsable)}</dd></div>` : ''}
+      ${reasignado(t) ? `<div><dt>Lo hace en la práctica (COO)</dt><dd class="reas-t">${esc(t.responsableOp)} · Reasignado</dd></div>` : ''}
       <div><dt>Última actualización</dt><dd>${t.actualizacion ? fmt(t.actualizacion) + ' ' + esc(String(t.actualizacion).slice(11, 16)) : '—'}</dd></div>
     </dl>
     ${t.etapa === 'Tarea' ? `
@@ -692,7 +700,7 @@ function abrirDetalle(id) {
       <label class="l" for="fCom">Comentario del COO</label>
       ${coo ? `<textarea class="in" id="fCom" placeholder="¿Cómo viene este tema?">${esc(t.comentario)}</textarea>`
             : `<div class="leer">${t.comentario ? esc(t.comentario) : '<em>Sin comentarios todavía</em>'}</div>`}
-      ${coo && t.cuadrante === 'Delegar' ? `<label class="l" for="fResp">¿A quién se delegó?</label><input class="in" id="fResp" value="${esc(t.responsable)}" placeholder="Nombre o área">` : ''}` : ''}
+      ${coo && t.cuadrante === 'Delegar' ? `<label class="l" for="fResp">¿Quién lo hace en la práctica? <span class="nota">(solo si no es ${esc(t.responsable || 'el definido por el CEO')})</span></label><input class="in" id="fResp" value="${esc(t.responsableOp)}" placeholder="Dejalo vacío si lo hace ${esc(t.responsable || 'quien definió el CEO')}">` : ''}` : ''}
     <div class="acciones">
       ${coo && t.etapa === 'Tarea' ? '<button class="btn pri" data-act="guardarDet">Guardar avance</button>' : ''}
       ${!coo ? (t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">Reclasificar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
@@ -783,7 +791,7 @@ const H = {
   setAv: el => { form.avance = el.dataset.v; document.querySelectorAll('#segAv button').forEach(b => b.classList.toggle('on', b.dataset.v === form.avance)); },
   guardarDet: async () => {
     const datos = { avance: form.avance, comentario: $('#fCom').value.trim() };
-    if ($('#fResp')) datos.responsable = $('#fResp').value.trim();
+    if ($('#fResp')) datos.responsableOp = $('#fResp').value.trim();
     if (await enviar('editarTema', { id: form.id, datos }, 'Avance actualizado')) cerrarModal();
   },
   archivar: async el => { if (!confirm('¿Archivar este tema? Queda guardado en el Archivo.')) return; if (await enviar('editarTema', { id: el.dataset.id, datos: { etapa: 'Archivada' } }, 'Tema archivado')) cerrarModal(); },
@@ -860,7 +868,8 @@ const Demo = (() => {
           const t = temas.find(z => z.id === x.id); if (!t) throw new Error('No encuentro el tema');
           Object.keys(x.datos).forEach(k => {
             if ((k === 'avance' || k === 'comentario') && rol !== 'COO') throw new Error('Solo el COO puede cambiar el avance');
-            if (k !== 'avance' && k !== 'comentario' && k !== 'responsable' && rol !== 'CEO') throw new Error('Solo el CEO puede clasificar');
+            if (k === 'responsableOp' && rol !== 'COO') throw new Error('Solo el COO puede reasignar');
+            if (k !== 'avance' && k !== 'comentario' && k !== 'responsableOp' && rol !== 'CEO') throw new Error('Solo el CEO puede clasificar');
             t[k] = x.datos[k] == null ? '' : x.datos[k];
           });
           if (t.etapa === 'Tarea') { if (!t.validacion) t.validacion = d(0); if (!t.avance) t.avance = 'Recibido'; }
