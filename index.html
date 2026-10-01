@@ -148,6 +148,12 @@ button.g-name:hover{background:#f7f9fc}
 .btn.sec{background:var(--azul-suave);color:var(--azul)}
 .btn.peligro{background:#fde3e3;color:#a41c1c}
 .btn.ancho{width:100%}
+.btn.volver{background:#fff;border:2px solid #b9c2d0;color:var(--gris);order:9}
+.btn.volver:hover{background:#f4f6fa}
+.modal{position:relative}
+.x{position:absolute;top:12px;right:12px;width:48px;height:48px;border-radius:50%;border:2px solid #b9c2d0;background:#fff;color:var(--gris);font-size:1.3rem;font-weight:700;display:flex;align-items:center;justify-content:center;z-index:2}
+.x:hover{background:#f4f6fa}
+.modal h3{padding-right:56px}
 .fab{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;justify-content:center;z-index:30;background:var(--azul);color:#fff;border:0;border-radius:18px;min-height:66px;padding:0 28px;font-size:1.2rem;font-weight:700;box-shadow:0 8px 24px rgba(19,67,130,.4);display:flex;align-items:center;gap:10px}
 .fab svg{width:28px;height:28px}
 
@@ -235,6 +241,8 @@ textarea.grande{min-height:130px;font-size:1.15rem;padding-right:70px}
   .modal{padding:18px 16px 20px}
   .fab{bottom:70px;width:min(340px,calc(100% - 24px))}
   .alta{flex-direction:column}
+  .acciones .btn{flex:1 1 40%}
+  .acciones .btn.volver{flex:1 1 100%}
   .g-name small{display:none}
 }
 @media print{.fab,.tabs,.top .ibtn{display:none}}
@@ -616,7 +624,7 @@ function vistaArchivo() {
 
 /* ---------- Ventanas ---------- */
 function modal(html) {
-  $('#modal').innerHTML = `<div class="velo"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
+  $('#modal').innerHTML = `<div class="velo"><div class="modal" role="dialog" aria-modal="true"><button class="x" data-act="cerrarModal" aria-label="Volver" title="Volver">✕</button>${html}</div></div>`;
   document.body.classList.add('con-modal');
 }
 function cerrarModal() {
@@ -639,7 +647,7 @@ function abrirNueva() {
     <label class="l" for="nFecha">Fecha</label>
     <input type="date" class="in" id="nFecha" value="${esc(S.hoy)}">
     <div id="mErr" class="err"></div>
-    <div class="acciones"><button class="btn pri" data-act="guardarIdea">Guardar idea</button><button class="btn sec" data-act="cerrarModal">Cancelar</button></div>`);
+    <div class="acciones"><button class="btn pri" data-act="guardarIdea">Guardar idea</button><button class="btn volver" data-act="cerrarModal">← Volver</button></div>`);
   setTimeout(() => { const t = $('#nTema'); if (t) t.focus(); }, 60);
 }
 function dictar(btn) {
@@ -689,7 +697,7 @@ function abrirDetalle(id) {
       ${coo && t.etapa === 'Tarea' ? '<button class="btn pri" data-act="guardarDet">Guardar avance</button>' : ''}
       ${!coo ? (t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">Reclasificar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
                                     : `<button class="btn sec" data-act="reactivar" data-id="${esc(t.id)}">Volver a Ideas</button>`) : ''}
-      <button class="btn sec" data-act="cerrarModal">Cerrar</button>
+      <button class="btn volver" data-act="cerrarModal">← Volver</button>
     </div>`);
 }
 
@@ -719,7 +727,7 @@ function abrirMesa(id) {
     <div class="acciones">
       <button class="btn pri" data-act="mesaOk">${form.esIdea ? 'Pasar a tarea' : 'Guardar cambios'}</button>
       ${form.esIdea ? '<button class="btn peligro" data-act="mesaArch">Archivar idea</button>' : ''}
-      <button class="btn sec" data-act="cerrarModal">Cancelar</button>
+      <button class="btn volver" data-act="cerrarModal">← Volver</button>
     </div>`);
   pintarMesa();
 }
