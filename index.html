@@ -703,7 +703,7 @@ function abrirDetalle(id) {
       ${coo && t.cuadrante === 'Delegar' ? `<label class="l" for="fResp">¿Quién lo hace en la práctica? <span class="nota">(solo si no es ${esc(t.responsable || 'el definido por el CEO')})</span></label><input class="in" id="fResp" value="${esc(t.responsableOp)}" placeholder="Dejalo vacío si lo hace ${esc(t.responsable || 'quien definió el CEO')}">` : ''}` : ''}
     <div class="acciones">
       ${coo && t.etapa === 'Tarea' ? '<button class="btn pri" data-act="guardarDet">Guardar avance</button>' : ''}
-      ${!coo ? (t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">Reclasificar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
+      ${!coo ? (t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">✏️ Editar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
                                     : `<button class="btn sec" data-act="reactivar" data-id="${esc(t.id)}">Volver a Ideas</button>`) : ''}
       <button class="btn volver" data-act="cerrarModal">← Volver</button>
     </div>`);
@@ -716,7 +716,7 @@ function abrirMesa(id) {
   const sug = sugerir(t.urgencia, t.importancia);
   form = { id, u: t.urgencia || '', i: t.importancia || '', cuad: t.cuadrante || '', manual: !!t.cuadrante && t.cuadrante !== sug, esIdea: t.etapa !== 'Tarea' };
   const seg = (grp, val) => NIVELES.map(n => `<button type="button" class="${n === val ? 'on' : ''}" data-act="nivel" data-grp="${grp}" data-v="${n}">${n}</button>`).join('');
-  modal(`<h3>${form.esIdea ? 'Tratar en la Mesa' : 'Reclasificar tema'}</h3>
+  modal(`<h3>${form.esIdea ? 'Tratar en la Mesa' : 'Editar tema'}</h3>
     <label class="l" for="mTema">Tema</label>
     <input class="in" id="mTema" value="${esc(t.tema)}">
     <label class="l" for="mDet">Detalle <span class="nota">(opcional)</span></label>
