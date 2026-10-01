@@ -112,26 +112,34 @@ details.hist summary{cursor:pointer;font-weight:700;color:var(--gris);padding:8p
 .ley i.hoy-i{width:3px;background:var(--bad);border-radius:0}
 .gantt{border:1px solid var(--borde);border-radius:14px;overflow:hidden;background:#fff}
 .g-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.g-row{display:flex;min-height:56px;border-bottom:1px solid #edf0f5;position:relative}
+.g-row{display:flex;min-height:62px;border-bottom:1px solid #edf0f5;position:relative}
 .g-name{position:sticky;left:0;z-index:3;background:#fff;width:var(--nw);flex:none;padding:8px 12px;border:0;border-right:2px solid var(--borde);border-left:6px solid var(--c);text-align:left;display:flex;flex-direction:column;justify-content:center;gap:2px}
 button.g-name:hover{background:#f7f9fc}
-.g-name span{font-weight:700;font-size:.95rem;line-height:1.25}
-.g-name small{color:var(--gris);font-size:.78rem}
-.g-head{min-height:40px;background:#f7f9fc}
+.g-name span{font-weight:700;font-size:1rem;line-height:1.25}
+.g-name small{color:var(--gris);font-size:.8rem}
+.g-head{min-height:64px;background:#f7f9fc}
 .g-head .g-name{background:#f7f9fc;border-left-color:transparent;font-weight:700;color:var(--gris)}
+.g-head .g-track{height:64px}
 .g-track{position:relative;flex:none}
-.sem{position:absolute;top:0;bottom:0;border-left:1px solid var(--borde);font-size:.78rem;color:var(--gris);padding:10px 6px;white-space:nowrap;font-weight:700}
+.mes{position:absolute;top:0;height:32px;border-left:2px solid var(--borde);padding:7px 8px;font-weight:700;color:var(--azul);font-size:.88rem;white-space:nowrap;overflow:hidden}
+.dia{position:absolute;top:34px;height:26px;line-height:26px;text-align:center;font-size:.78rem;color:var(--gris);font-weight:700}
+.dia.fin{color:#a6aebb}
+.dia.hoy{background:var(--bad);color:#fff;border-radius:7px}
+.dia.semh{text-align:left;padding-left:6px;border-left:1px solid var(--borde)}
+.hoy-tag{position:absolute;top:36px;transform:translateX(-50%);background:var(--bad);color:#fff;border-radius:6px;padding:0 6px;font-size:.72rem;font-weight:700;line-height:20px;z-index:2}
 .g-body{position:relative}
 .g-over{position:absolute;top:0;bottom:0;left:var(--nw);pointer-events:none;z-index:0}
 .fds{position:absolute;top:0;bottom:0;background:#f4f6fa}
+.g-sem{position:absolute;top:0;bottom:0;border-left:1px solid #e1e6ee}
 .g-hoy{position:absolute;top:0;bottom:0;width:3px;background:var(--bad);opacity:.85}
 .g-row .g-track{z-index:1}
-.g-bar{position:absolute;top:12px;height:32px;border-radius:8px;background:var(--c);color:#fff;font-size:.8rem;font-weight:700;padding:0 8px;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
+.g-bar{position:absolute;top:13px;height:36px;border-radius:9px;background:var(--c);color:#fff;font-size:.85rem;font-weight:700;padding:0 10px;display:flex;align-items:center;white-space:nowrap;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.12)}
 .g-bar.venc{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--bad)}
 .g-bar.cerr{opacity:.4}
-.g-hito{position:absolute;top:17px;width:22px;height:22px;background:var(--c);transform:rotate(45deg);border-radius:3px}
+.g-hito{position:absolute;top:19px;width:24px;height:24px;background:var(--c);transform:rotate(45deg);border-radius:4px}
 .g-hito.venc{box-shadow:0 0 0 3px var(--bad)}
-.g-hito-t{position:absolute;top:18px;font-size:.78rem;color:var(--gris);white-space:nowrap;font-weight:700}
+.g-lbl{position:absolute;top:21px;font-size:.85rem;color:var(--texto);white-space:nowrap;font-weight:700}
+.ley i.venc-i{background:#fff;box-shadow:0 0 0 2px var(--bad)}
 
 /* Botones */
 .btn{min-height:56px;border:0;border-radius:14px;padding:0 24px;font-weight:700;font-size:1.05rem}
@@ -261,6 +269,7 @@ const CUADS = [
 const AVANCES = ['Recibido', 'Aceptado', 'En curso', 'Bloqueado', 'Cerrado'];
 const NIVELES = ['Poco', 'Algo', 'Mucho'];
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESES_L = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 const S = { pin: '', rol: '', temas: [], agenda: [], semaforo: { amarillo: 10, rojo: 15 },
             hoy: '', tab: 'matriz', verCerradas: false, ocupado: false, xHoy: 0 };
@@ -515,36 +524,57 @@ function vistaGantt() {
   let h = `<section class="panel">
     <div class="barra"><h2 class="tit">Gantt de Dirección</h2>
     <label class="tog"><input type="checkbox" data-act="togCerr" ${S.verCerradas ? 'checked' : ''}> Mostrar cerradas</label></div>
-    <div class="leyenda">${ley}<span class="ley"><i class="hoy-i"></i>Hoy</span></div>`;
+    <div class="leyenda">${ley}<span class="ley"><i class="hoy-i"></i>Hoy</span><span class="ley"><i class="venc-i"></i>Vencida</span></div>`;
   if (!con.length) {
     h += '<div class="vacio">Todavía no hay tareas con fechas. Las fechas se cargan al pasar una idea a tarea en la Mesa.</div>';
   } else {
     const hoy = hoyD();
     let min = hoy, max = hoy;
     con.forEach(t => { const a = pd(t.inicio || t.limite), b = pd(t.limite || t.inicio); if (a < min) min = a; if (b > max) max = b; });
-    let start = addD(min, -3); start = addD(start, -((start.getDay() + 6) % 7));
-    let end = addD(max, 10); if (dif(start, end) < 55) end = addD(start, 55);
-    const nd = dif(start, end) + 1, dw = window.innerWidth < 700 ? 16 : 26, W = nd * dw;
-    let sem = '', fds = '';
-    for (let i = 0; i < nd; i += 7) { const d = addD(start, i); sem += `<div class="sem" style="left:${i * dw}px;width:${7 * dw}px">${d.getDate()} ${MESES[d.getMonth()]}</div>`; }
-    for (let i = 0; i < nd; i++) { const wd = addD(start, i).getDay(); if (wd === 0 || wd === 6) fds += `<div class="fds" style="left:${i * dw}px;width:${dw}px"></div>`; }
+    let start = addD(min, -4); start = addD(start, -((start.getDay() + 6) % 7));
+    let end = addD(max, 7); end = addD(end, 6 - ((end.getDay() + 6) % 7));
+    if (dif(start, end) < 34) end = addD(start, 34);
+    const nd = dif(start, end) + 1;
+    const movil = window.innerWidth < 700;
+    const nw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nw')) || 270;
+    const disp = Math.min(window.innerWidth - 20, 1320) - 44 - 46 - nw;
+    const dw = movil ? 18 : Math.max(14, Math.min(64, Math.floor(disp / nd)));
+    const W = nd * dw;
+    let meses = '', dias = '', lineas = '', fds = '';
+    for (let i = 0; i < nd; i++) {
+      const d = addD(start, i), wd = d.getDay(), fin = wd === 0 || wd === 6;
+      if (i === 0 || d.getDate() === 1) {
+        let j = i; while (j < nd && addD(start, j).getMonth() === d.getMonth()) j++;
+        meses += `<div class="mes" style="left:${i * dw}px;width:${(j - i) * dw}px">${MESES_L[d.getMonth()]} ${d.getFullYear()}</div>`;
+      }
+      if (fin) fds += `<div class="fds" style="left:${i * dw}px;width:${dw}px"></div>`;
+      if (wd === 1) lineas += `<div class="g-sem" style="left:${i * dw}px"></div>`;
+      if (dw >= 24) dias += `<div class="dia ${fd(d) === S.hoy ? 'hoy' : ''} ${fin ? 'fin' : ''}" style="left:${i * dw}px;width:${dw}px">${d.getDate()}</div>`;
+      else if (wd === 1) dias += `<div class="dia semh" style="left:${i * dw}px;width:${7 * dw}px">${d.getDate()} ${MESES[d.getMonth()]}</div>`;
+    }
     S.xHoy = dif(start, hoy) * dw + dw / 2;
+    const tagHoy = dw >= 24 ? '' : `<div class="hoy-tag" style="left:${S.xHoy}px">Hoy</div>`;
     const filas = con.map(t => {
       const c = colorCuad(t.cuadrante), cerr = t.avance === 'Cerrado', v = vencida(t);
       let bar;
       if (t.inicio && t.limite) {
         const a = pd(t.inicio), b = pd(t.limite), l = dif(start, a) * dw, w = Math.max((dif(a, b) + 1) * dw, dw);
-        bar = `<div class="g-bar ${v ? 'venc' : ''} ${cerr ? 'cerr' : ''}" style="left:${l}px;width:${w}px;--c:${c}" title="${esc(fmt(t.inicio) + ' → ' + fmt(t.limite))}">${esc(fcorta(t.inicio) + ' → ' + fcorta(t.limite))}</div>`;
+        const nDias = dif(a, b) + 1;
+        const lbl = t.inicio === t.limite ? fcorta(t.inicio) : fcorta(t.inicio) + ' → ' + fcorta(t.limite);
+        const tip = fmt(t.inicio) + ' → ' + fmt(t.limite) + ' (' + nDias + (nDias === 1 ? ' día)' : ' días)');
+        const entra = w >= lbl.length * 8 + 22;
+        bar = `<div class="g-bar ${v ? 'venc' : ''} ${cerr ? 'cerr' : ''}" style="left:${l}px;width:${w}px;--c:${c}" title="${esc(tip)}">${entra ? esc(lbl) : ''}</div>`
+            + (entra ? '' : `<span class="g-lbl" style="left:${l + w + 10}px">${esc(lbl)}</span>`);
       } else {
-        const d = pd(t.limite || t.inicio), l = dif(start, d) * dw + dw / 2 - 11;
+        const d = pd(t.limite || t.inicio), l = dif(start, d) * dw + dw / 2 - 12;
         const et = (t.limite ? 'Límite ' : 'Arranque ') + fcorta(t.limite || t.inicio);
-        bar = `<div class="g-hito ${v ? 'venc' : ''}" style="left:${l}px;--c:${c}" title="${esc(et)}"></div><span class="g-hito-t" style="left:${l + 30}px">${esc(et)}</span>`;
+        bar = `<div class="g-hito ${v ? 'venc' : ''}" style="left:${l}px;--c:${c}" title="${esc(et)}"></div><span class="g-lbl" style="left:${l + 32}px">${esc(et)}</span>`;
       }
       return `<div class="g-row"><button class="g-name" data-act="ver" data-id="${esc(t.id)}" style="--c:${c}"><span>${esc(t.tema)}</span><small>${esc(t.cuadrante)} · ${esc(t.avance || '')}${v ? ' · <b class="vencida">Vencida</b>' : ''}</small></button><div class="g-track" style="width:${W}px">${bar}</div></div>`;
     }).join('');
     h += `<div class="gantt"><div class="g-scroll" id="gScroll"><div style="width:calc(var(--nw) + ${W}px)">
-      <div class="g-row g-head"><div class="g-name g-hn">Tema</div><div class="g-track" style="width:${W}px">${sem}</div></div>
-      <div class="g-body"><div class="g-over" style="width:${W}px">${fds}<div class="g-hoy" style="left:${S.xHoy}px"></div></div>${filas}</div>
+      <div class="g-row g-head"><div class="g-name g-hn">Tema</div><div class="g-track" style="width:${W}px">${meses}${dias}${tagHoy}</div></div>
+      <div class="g-body"><div class="g-over" style="width:${W}px">${fds}${lineas}<div class="g-hoy" style="left:${S.xHoy - 1}px"></div></div>${filas}</div>
     </div></div></div>`;
   }
   if (sin.length) h += `<h3 class="sub-t">Tareas sin fechas (${sin.length})</h3><div class="lista" style="padding:0">${sin.map(card).join('')}</div>`;
