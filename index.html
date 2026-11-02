@@ -685,7 +685,7 @@ async function guardarIdea() {
   const eA = errorAviso(); if (eA) { $('#mErr').textContent = eA; return; }
   const r = recordarTxt();
   const ok = await enviar('nuevaIdea', { datos: { tema, detalle: $('#nDet').value.trim(), fechaCarga: $('#nFecha').value || S.hoy, recordar: r, avisarA: r ? avisarA() : '' } },
-    r ? 'Idea guardada. Te suena el ' + diaLargo(r) + ' a las ' + r.slice(11, 16) + '.' : 'Idea guardada. Se trata en la próxima Mesa.');
+    r ? 'Idea guardada. Te suena ' + (r.slice(0, 10) === fd(new Date()) ? 'hoy' : 'el ' + diaLargo(r)) + ' a las ' + r.slice(11, 16) + '.' : 'Idea guardada. Se trata en la próxima Mesa.');
   if (ok) cerrarModal();
 }
 
@@ -794,20 +794,24 @@ async function mesaOk() {
 
 /* ---------- Recordatorio (Google Calendar) ---------- */
 const DIAS_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-function ahoraTxt() { const x = new Date(); return fd(x) + ' ' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); }
+function fdh(x) { return fd(x) + ' ' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); }
+function ahoraTxt() { return fdh(new Date()); }
+// Ahora + n minutos, redondeado hacia arriba a múltiplos de 5
+function dentroDe(min) { const x = new Date(Date.now() + min * 60000); x.setSeconds(0, 0); x.setMinutes(Math.ceil(x.getMinutes() / 5) * 5); return x; }
 function diaLargo(s) { const d = pd(s); return d ? DIAS_L[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES_L[d.getMonth()].toLowerCase() : ''; }
 function recActivo(t) { return !!t.recordar && t.recordar > ahoraTxt() && t.etapa !== 'Archivada' && t.avance !== 'Cerrado'; }
 function chipRec(t) { return recActivo(t) ? `<span class="chip rec">🔔 ${fcorta(t.recordar)} ${esc(t.recordar.slice(11, 16))}</span>` : ''; }
 function iniciarAviso(t) {
   const r = t && recActivo(t) ? t.recordar : '';
-  form.av = { modo: r ? 'fecha' : 'no', fecha: r ? r.slice(0, 10) : fd(addD(hoyD(), 1)), hora: r ? r.slice(11, 16) : '09:00',
+  const prox = fdh(dentroDe(60));
+  form.av = { modo: r ? 'fecha' : 'no', fecha: r ? r.slice(0, 10) : prox.slice(0, 10), hora: r ? r.slice(11, 16) : prox.slice(11, 16),
               a: t && t.avisarA === 'CEO+COO' ? 'ambos' : 'yo', orig: t ? t.avisarA || '' : '', tocado: false };
 }
 function bloqueAviso() {
   const otro = S.rol === 'CEO' ? 'Garay' : 'José';
-  const modos = [['no', 'No'], ['manana', 'Mañana 9 h'], ['semana', 'En 1 semana'], ['fecha', 'Elegir día']];
+  const modos = [['no', 'No'], ['1h', 'En 1 hora'], ['3h', 'En 3 horas'], ['manana', 'Mañana'], ['semana', 'En 7 días'], ['fecha', 'Otra fecha']];
   return `<label class="l">¿Te aviso? <span class="nota">(te suena en el celular por Google Calendar)</span></label>
-    <div class="seg seg4" id="segAvM">${modos.map(([k, l]) => `<button type="button" data-act="avModo" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="seg" id="segAvM">${modos.map(([k, l]) => `<button type="button" data-act="avModo" data-v="${k}">${l}</button>`).join('')}</div>
     <div class="dos" id="avFecha">
       <div><label class="l" for="avF">Día</label><input type="date" class="in" id="avF" value="${esc(form.av.fecha)}" min="${esc(S.hoy)}"></div>
       <div><label class="l" for="avH">Hora</label><input type="time" class="in" id="avH" value="${esc(form.av.hora)}"></div>
@@ -818,6 +822,8 @@ function bloqueAviso() {
 }
 function recordarTxt() {
   const a = form.av; if (!a || a.modo === 'no') return '';
+  if (a.modo === '1h') return fdh(dentroDe(60));
+  if (a.modo === '3h') return fdh(dentroDe(180));
   if (a.modo === 'manana') return fd(addD(hoyD(), 1)) + ' 09:00';
   if (a.modo === 'semana') return fd(addD(hoyD(), 7)) + ' 09:00';
   return a.fecha && a.hora ? a.fecha + ' ' + a.hora : '';
@@ -832,18 +838,22 @@ function errorAviso() {
   if (!form.av || form.av.modo === 'no') return '';
   const r = recordarTxt();
   if (!r) return 'Elegí el día y la hora del aviso.';
-  if (r <= ahoraTxt()) return 'El aviso tiene que ser para más adelante.';
+  if (r <= ahoraTxt()) return 'Esa hora ya pasó: elegí una hora más tarde.';
   return '';
 }
 function pintarAviso() {
   const a = form.av; if (!a || !$('#segAvM')) return;
+  if ($('#mErr')) $('#mErr').textContent = '';
   a.fecha = $('#avF').value; a.hora = $('#avH').value;
   document.querySelectorAll('#segAvM button').forEach(b => b.classList.toggle('on', b.dataset.v === a.modo));
   document.querySelectorAll('#segAvA button').forEach(b => b.classList.toggle('on', b.dataset.v === a.a));
   $('#avFecha').classList.toggle('oculto', a.modo !== 'fecha');
   $('#avQuien').classList.toggle('oculto', a.modo === 'no');
   const r = recordarTxt();
-  $('#avRes').textContent = a.modo === 'no' ? '' : r ? '🔔 Suena el ' + diaLargo(r) + ' a las ' + r.slice(11, 16) + (a.a === 'ambos' ? ' · a los dos' : '') : 'Elegí el día y la hora.';
+  const cuando = r && r.slice(0, 10) === fd(new Date()) ? 'hoy' : 'el ' + diaLargo(r);
+  $('#avRes').textContent = a.modo === 'no' ? '' : !r ? 'Elegí el día y la hora.'
+    : r <= ahoraTxt() ? '⚠ Esa hora ya pasó: elegí una más tarde.'
+    : '🔔 Suena ' + cuando + ' a las ' + r.slice(11, 16) + (a.a === 'ambos' ? ' · a los dos' : '');
 }
 
 /* ---------- Acciones ---------- */
