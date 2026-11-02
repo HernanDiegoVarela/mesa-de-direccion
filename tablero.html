@@ -195,6 +195,26 @@ body.owner .odoo{display:block}
 .micb svg{width:20px;height:20px}
 .micb.on{background:var(--red);color:var(--card)}
 .pick.gb{background:var(--amber);border-color:var(--amber);color:var(--card);padding:11px 16px}
+/* Panel de elección destacado: azul fuerte mientras falta elegir; tenue cuando ya eligió */
+.fb{background:var(--steel);border-top:0;padding:14px 16px 16px;gap:10px;position:relative}
+.fb .q{color:#fff;font-size:1.08rem;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.fb .q::before{white-space:nowrap}
+.fb .dist .fbo[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#fff}
+.fb .dist .fbo{border-width:1.5px;border-color:#B9C4CE}
+.fb .dist textarea{border:1.5px solid var(--amber)}
+.fb .q::before{content:"TU ELECCIÓN";font-family:var(--f-body);font-size:.68rem;letter-spacing:.08em;font-weight:700;background:#fff;color:var(--steel);border-radius:999px;padding:3px 9px}
+.fb > .st{color:#fff;opacity:.9}
+.fb .pick{font-size:.98rem;padding:13px 8px;border-width:2px;background:#fff;color:#13202B}
+.fb .pick.si{border-color:var(--green)} .fb .pick.di{border-color:var(--amber)} .fb .pick.no{border-color:#9AA6B2}
+.fb .pick.si[aria-pressed="true"]{background:var(--green);color:#fff;box-shadow:0 0 0 3px #fff}
+.fb .pick.di[aria-pressed="true"]{background:var(--amber);color:#fff;box-shadow:0 0 0 3px #fff}
+.fb .pick.no[aria-pressed="true"]{background:var(--grey);color:#fff;box-shadow:0 0 0 3px #fff}
+.fb .dist{border-width:2px}
+.fb .pick.gb{background:var(--amber);color:#fff;box-shadow:none}
+.card[data-pick] > .fb{background:var(--steel-soft)}
+.card[data-pick] > .fb .q{color:var(--ink)}
+.card[data-pick] > .fb .q::before{content:"YA ELEGISTE";background:var(--steel);color:#fff}
+.card[data-pick] > .fb > .st{color:var(--ink-2)}
 
 /* Pie */
 .foot-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
