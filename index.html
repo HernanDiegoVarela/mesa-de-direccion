@@ -173,6 +173,11 @@ textarea.grande{min-height:130px;font-size:1.15rem;padding-right:70px}
 .in:focus{outline:none;border-color:var(--azul)}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .seg5{grid-template-columns:repeat(5,1fr)}
+.seg4{grid-template-columns:repeat(4,1fr)}
+.seg2{grid-template-columns:repeat(2,1fr)}
+.chip.rec{background:#e7f0ff;color:#134382}
+.av-res{margin-top:12px;font-weight:700;color:var(--azul);min-height:1.4em}
+.lect{background:#efe6fb;color:#5b2d9c;text-align:center;font-weight:700;padding:8px 14px;font-size:.9rem;border-bottom:1px solid #d9c6f3}
 .seg button{min-height:56px;border:2px solid var(--borde);background:#fff;border-radius:12px;font-weight:700;font-size:1rem;padding:4px}
 .seg button.on{background:var(--azul);border-color:var(--azul);color:#fff}
 .seg button:disabled:not(.on){opacity:.55}
@@ -237,7 +242,7 @@ textarea.grande{min-height:130px;font-size:1.15rem;padding-right:70px}
   .kpi{padding:12px 14px;gap:12px}
   .kpi .num{font-size:2.1rem}
   .luz{width:38px;height:38px}
-  .seg5{grid-template-columns:repeat(2,1fr)}
+  .seg5,.seg4{grid-template-columns:repeat(2,1fr)}
   .qbtns{grid-template-columns:1fr 1fr}
   .datos,.dos{grid-template-columns:1fr}
   .modal{padding:18px 16px 20px}
@@ -306,6 +311,8 @@ function fcorta(s) { const d = pd(s); return d ? d.getDate() + ' ' + MESES[d.get
 function hoyD() { return pd(S.hoy) || pd(fd(new Date())); }
 function dias(s) { const d = pd(s); return d ? Math.max(dif(d, hoyD()), 0) : 0; }
 function haceTxt(s) { const n = dias(s); return n === 0 ? 'hoy' : n === 1 ? 'hace 1 día' : 'hace ' + n + ' días'; }
+const ROL_TXT = { CEO: 'CEO', COO: 'COO', AUDITORA: 'Auditora' };
+const soloLectura = () => S.rol === 'AUDITORA';
 const colorCuad = k => (CUADS.find(c => c.k === k) || { c: 'var(--azul)' }).c;
 
 // Regla de ubicación: urgente = "Mucho"; importante = "Algo" o "Mucho"
@@ -381,7 +388,7 @@ function vistaLogin(msg) {
     <label class="rec"><input type="checkbox" id="recordar" checked> Recordarme en este equipo</label>
     ${msg ? `<div class="err">${esc(msg)}</div>` : ''}
     <button class="btn pri ancho" data-act="entrar">Entrar</button>
-    ${DEMO ? '<p class="demo-hint">Modo demostración · CEO: 1111 · COO: 2222</p>' : ''}
+    ${DEMO ? '<p class="demo-hint">Modo demostración · CEO: 1111 · COO: 2222 · Auditora: 3333</p>' : ''}
   </div></div>`;
   const p = $('#pin'); p.focus();
   p.addEventListener('keydown', e => { if (e.key === 'Enter') doEntrar(); });
@@ -409,9 +416,10 @@ function render() {
   if (!S.rol) return vistaLogin();
   const vistas = { matriz: vistaMatriz, ideas: vistaIdeas, gantt: vistaGantt, agenda: vistaAgenda, archivo: vistaArchivo };
   $('#app').innerHTML = cabecera() + (DEMO ? '<div class="demo">Modo demostración · los datos son de ejemplo y no se guardan en la planilla</div>' : '')
+    + (soloLectura() ? '<div class="lect">Acceso de auditoría · solo lectura</div>' : '')
     + indicadores() + alarma() + pestanas()
     + `<main class="vista">${(vistas[S.tab] || vistaMatriz)()}</main>`
-    + `<button class="fab" data-act="nueva">${IC.mas}Nueva idea</button>`;
+    + (soloLectura() ? '' : `<button class="fab" data-act="nueva">${IC.mas}Nueva idea</button>`);
   if (S.tab === 'gantt') {
     const g = $('#gScroll');
     if (g) { const nw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nw')) || 0; g.scrollLeft = Math.max(S.xHoy - (g.clientWidth - nw) * 0.3, 0); }
@@ -422,7 +430,7 @@ function cabecera() {
   return `<header class="top">
     <img src="${LOGO}" alt="Tecnología ARME">
     <h1>Mesa de Dirección</h1>
-    <span class="rol">${esc(S.rol)}</span>
+    <span class="rol">${esc(ROL_TXT[S.rol] || S.rol)}</span>
     <button class="ibtn" data-act="recargar" title="Actualizar">${IC.recargar}<span class="txt">Actualizar</span></button>
     <button class="ibtn" data-act="salir" title="Salir">${IC.salir}<span class="txt">Salir</span></button>
   </header>`;
@@ -485,7 +493,7 @@ function card(t) {
   const v = vencida(t);
   return `<button class="card" style="--c:${colorCuad(t.cuadrante)}" data-act="ver" data-id="${esc(t.id)}">
     <div class="t">${esc(t.tema)}</div>
-    <div class="meta">${chipCoo(t)}${chipAvance(t)}
+    <div class="meta">${chipCoo(t)}${chipAvance(t)}${chipRec(t)}
       <span>Abierto ${haceTxt(t.fechaCarga)}</span>
       ${t.limite ? `<span class="${v ? 'vencida' : ''}">${v ? '⚠ Vencida · ' : 'Límite '}${fmt(t.limite)}</span>` : ''}
       ${respTxt(t)}
@@ -524,7 +532,7 @@ function vistaIdeas() {
       return `<div class="idea">
         <div class="t">${esc(t.tema)}</div>
         ${t.detalle ? `<div class="det">${esc(t.detalle)}</div>` : ''}
-        <div class="meta"><span>Anotada el ${fmt(t.fechaCarga)}</span><span class="${n > 14 ? 'vencida' : ''}">${n === 0 ? 'Cargada hoy' : 'Esperando ' + n + (n === 1 ? ' día' : ' días')}</span></div>
+        <div class="meta"><span>Anotada el ${fmt(t.fechaCarga)}</span><span class="${n > 14 ? 'vencida' : ''}">${n === 0 ? 'Cargada hoy' : 'Esperando ' + n + (n === 1 ? ' día' : ' días')}</span>${chipRec(t)}</div>
         ${S.rol === 'CEO' ? `<button class="btn pri" data-act="mesa" data-id="${esc(t.id)}">Tratar en la Mesa</button>` : '<div class="nota">Se trata en la Mesa con el CEO</div>'}
       </div>`;
     }).join('') : '<div class="vacio">No hay ideas esperando. Bandeja al día.</div>'}</div>
@@ -645,6 +653,7 @@ const modalAbierto = () => !!$('#modal').innerHTML;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null;
 function abrirNueva() {
+  form = {}; iniciarAviso(null);
   modal(`<h3>Nueva idea</h3>
     <label class="l" for="nTema">¿Qué tema o idea querés anotar?</label>
     <div class="dict"><textarea class="in grande" id="nTema" placeholder="${SR ? 'Escribí o tocá el micrófono y hablá' : 'Escribí el tema'}"></textarea>
@@ -653,8 +662,10 @@ function abrirNueva() {
     <textarea class="in" id="nDet" style="min-height:80px"></textarea>
     <label class="l" for="nFecha">Fecha</label>
     <input type="date" class="in" id="nFecha" value="${esc(S.hoy)}">
+    ${bloqueAviso()}
     <div id="mErr" class="err"></div>
     <div class="acciones"><button class="btn pri" data-act="guardarIdea">Guardar idea</button><button class="btn volver" data-act="cerrarModal">← Volver</button></div>`);
+  pintarAviso();
   setTimeout(() => { const t = $('#nTema'); if (t) t.focus(); }, 60);
 }
 function dictar(btn) {
@@ -671,7 +682,10 @@ function dictar(btn) {
 async function guardarIdea() {
   const tema = $('#nTema').value.trim();
   if (!tema) { $('#mErr').textContent = 'Escribí el tema antes de guardar.'; return; }
-  const ok = await enviar('nuevaIdea', { datos: { tema, detalle: $('#nDet').value.trim(), fechaCarga: $('#nFecha').value || S.hoy } }, 'Idea guardada. Se trata en la próxima Mesa.');
+  const eA = errorAviso(); if (eA) { $('#mErr').textContent = eA; return; }
+  const r = recordarTxt();
+  const ok = await enviar('nuevaIdea', { datos: { tema, detalle: $('#nDet').value.trim(), fechaCarga: $('#nFecha').value || S.hoy, recordar: r, avisarA: r ? avisarA() : '' } },
+    r ? 'Idea guardada. Te suena el ' + diaLargo(r) + ' a las ' + r.slice(11, 16) + '.' : 'Idea guardada. Se trata en la próxima Mesa.');
   if (ok) cerrarModal();
 }
 
@@ -692,6 +706,7 @@ function abrirDetalle(id) {
       <div><dt>Arranque → Límite</dt><dd class="${vencida(t) ? 'vencida' : ''}">${fmt(t.inicio)} → ${fmt(t.limite)}</dd></div>
       ${t.responsable ? `<div><dt>Responsable (definió el CEO)</dt><dd>${esc(t.responsable)}</dd></div>` : ''}
       ${reasignado(t) ? `<div><dt>Lo hace en la práctica (COO)</dt><dd class="reas-t">${esc(t.responsableOp)} · Reasignado</dd></div>` : ''}
+      ${chipRec(t) ? `<div><dt>Recordatorio</dt><dd>🔔 ${esc(diaLargo(t.recordar))} · ${esc(t.recordar.slice(11, 16))}${t.avisarA === 'CEO+COO' ? ' · a los dos' : ''}</dd></div>` : ''}
       <div><dt>Última actualización</dt><dd>${t.actualizacion ? fmt(t.actualizacion) + ' ' + esc(String(t.actualizacion).slice(11, 16)) : '—'}</dd></div>
     </dl>
     ${t.etapa === 'Tarea' ? `
@@ -703,7 +718,7 @@ function abrirDetalle(id) {
       ${coo && t.cuadrante === 'Delegar' ? `<label class="l" for="fResp">¿Quién lo hace en la práctica? <span class="nota">(solo si no es ${esc(t.responsable || 'el definido por el CEO')})</span></label><input class="in" id="fResp" value="${esc(t.responsableOp)}" placeholder="Dejalo vacío si lo hace ${esc(t.responsable || 'quien definió el CEO')}">` : ''}` : ''}
     <div class="acciones">
       ${coo && t.etapa === 'Tarea' ? '<button class="btn pri" data-act="guardarDet">Guardar avance</button>' : ''}
-      ${!coo ? (t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">✏️ Editar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
+      ${S.rol === 'CEO' ? (t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">✏️ Editar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
                                     : `<button class="btn sec" data-act="reactivar" data-id="${esc(t.id)}">Volver a Ideas</button>`) : ''}
       <button class="btn volver" data-act="cerrarModal">← Volver</button>
     </div>`);
@@ -715,6 +730,7 @@ function abrirMesa(id) {
   const t = S.temas.find(x => x.id === id); if (!t) return;
   const sug = sugerir(t.urgencia, t.importancia);
   form = { id, u: t.urgencia || '', i: t.importancia || '', cuad: t.cuadrante || '', manual: !!t.cuadrante && t.cuadrante !== sug, esIdea: t.etapa !== 'Tarea' };
+  iniciarAviso(t);
   const seg = (grp, val) => NIVELES.map(n => `<button type="button" class="${n === val ? 'on' : ''}" data-act="nivel" data-grp="${grp}" data-v="${n}">${n}</button>`).join('');
   modal(`<h3>${form.esIdea ? 'Tratar en la Mesa' : 'Editar tema'}</h3>
     <label class="l" for="mTema">Tema</label>
@@ -731,6 +747,7 @@ function abrirMesa(id) {
       <div><label class="l" for="mLim" id="lLim">Fecha límite</label><input type="date" class="in" id="mLim" value="${esc(t.limite)}"></div>
     </div>
     <div id="bResp"><label class="l" for="mResp">¿A quién se delega?</label><input class="in" id="mResp" value="${esc(t.responsable)}" placeholder="Nombre o área"></div>
+    ${bloqueAviso()}
     <div id="mErr" class="err"></div>
     <div class="acciones">
       <button class="btn pri" data-act="mesaOk">${form.esIdea ? 'Pasar a tarea' : 'Guardar cambios'}</button>
@@ -738,6 +755,7 @@ function abrirMesa(id) {
       <button class="btn volver" data-act="cerrarModal">← Volver</button>
     </div>`);
   pintarMesa();
+  pintarAviso();
 }
 function pintarMesa() {
   if (!form.manual) form.cuad = sugerir(form.u, form.i);
@@ -764,11 +782,68 @@ async function mesaOk() {
   if (!form.u || !form.i) return (err.textContent = 'Falta elegir urgencia e importancia.');
   if (form.cuad === 'Programar' && (!ini || !lim)) return (err.textContent = 'Para "Programar" cargá la fecha de arranque y la fecha límite.');
   if (ini && lim && ini > lim) return (err.textContent = 'La fecha de arranque no puede ser posterior a la fecha límite.');
+  const eA = errorAviso(); if (eA) return (err.textContent = eA);
+  const r = recordarTxt();
   const ok = await enviar('editarTema', { id: form.id, datos: {
     tema, detalle: $('#mDet').value.trim(), etapa: 'Tarea', urgencia: form.u, importancia: form.i,
-    cuadrante: form.cuad, inicio: ini, limite: lim, responsable: $('#mResp').value.trim()
+    cuadrante: form.cuad, inicio: ini, limite: lim, responsable: $('#mResp').value.trim(),
+    recordar: r, avisarA: r ? avisarA() : ''
   } }, form.esIdea ? 'Pasó a tarea: ' + form.cuad : 'Cambios guardados');
   if (ok) cerrarModal();
+}
+
+/* ---------- Recordatorio (Google Calendar) ---------- */
+const DIAS_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+function ahoraTxt() { const x = new Date(); return fd(x) + ' ' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); }
+function diaLargo(s) { const d = pd(s); return d ? DIAS_L[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES_L[d.getMonth()].toLowerCase() : ''; }
+function recActivo(t) { return !!t.recordar && t.recordar > ahoraTxt() && t.etapa !== 'Archivada' && t.avance !== 'Cerrado'; }
+function chipRec(t) { return recActivo(t) ? `<span class="chip rec">🔔 ${fcorta(t.recordar)} ${esc(t.recordar.slice(11, 16))}</span>` : ''; }
+function iniciarAviso(t) {
+  const r = t && recActivo(t) ? t.recordar : '';
+  form.av = { modo: r ? 'fecha' : 'no', fecha: r ? r.slice(0, 10) : fd(addD(hoyD(), 1)), hora: r ? r.slice(11, 16) : '09:00',
+              a: t && t.avisarA === 'CEO+COO' ? 'ambos' : 'yo', orig: t ? t.avisarA || '' : '', tocado: false };
+}
+function bloqueAviso() {
+  const otro = S.rol === 'CEO' ? 'Garay' : 'José';
+  const modos = [['no', 'No'], ['manana', 'Mañana 9 h'], ['semana', 'En 1 semana'], ['fecha', 'Elegir día']];
+  return `<label class="l">¿Te aviso? <span class="nota">(te suena en el celular por Google Calendar)</span></label>
+    <div class="seg seg4" id="segAvM">${modos.map(([k, l]) => `<button type="button" data-act="avModo" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="dos" id="avFecha">
+      <div><label class="l" for="avF">Día</label><input type="date" class="in" id="avF" value="${esc(form.av.fecha)}" min="${esc(S.hoy)}"></div>
+      <div><label class="l" for="avH">Hora</label><input type="time" class="in" id="avH" value="${esc(form.av.hora)}"></div>
+    </div>
+    <div id="avQuien"><label class="l">¿A quién le suena?</label>
+      <div class="seg seg2" id="segAvA"><button type="button" data-act="avA" data-v="yo">Solo a mí</button><button type="button" data-act="avA" data-v="ambos">A mí y a ${otro}</button></div></div>
+    <div class="av-res" id="avRes"></div>`;
+}
+function recordarTxt() {
+  const a = form.av; if (!a || a.modo === 'no') return '';
+  if (a.modo === 'manana') return fd(addD(hoyD(), 1)) + ' 09:00';
+  if (a.modo === 'semana') return fd(addD(hoyD(), 7)) + ' 09:00';
+  return a.fecha && a.hora ? a.fecha + ' ' + a.hora : '';
+}
+function avisarA() {
+  const a = form.av;
+  if (a.a === 'ambos') return 'CEO+COO';
+  if (!a.tocado && (a.orig === 'CEO' || a.orig === 'COO')) return a.orig;
+  return S.rol;
+}
+function errorAviso() {
+  if (!form.av || form.av.modo === 'no') return '';
+  const r = recordarTxt();
+  if (!r) return 'Elegí el día y la hora del aviso.';
+  if (r <= ahoraTxt()) return 'El aviso tiene que ser para más adelante.';
+  return '';
+}
+function pintarAviso() {
+  const a = form.av; if (!a || !$('#segAvM')) return;
+  a.fecha = $('#avF').value; a.hora = $('#avH').value;
+  document.querySelectorAll('#segAvM button').forEach(b => b.classList.toggle('on', b.dataset.v === a.modo));
+  document.querySelectorAll('#segAvA button').forEach(b => b.classList.toggle('on', b.dataset.v === a.a));
+  $('#avFecha').classList.toggle('oculto', a.modo !== 'fecha');
+  $('#avQuien').classList.toggle('oculto', a.modo === 'no');
+  const r = recordarTxt();
+  $('#avRes').textContent = a.modo === 'no' ? '' : r ? '🔔 Suena el ' + diaLargo(r) + ' a las ' + r.slice(11, 16) + (a.a === 'ambos' ? ' · a los dos' : '') : 'Elegí el día y la hora.';
 }
 
 /* ---------- Acciones ---------- */
@@ -787,6 +862,8 @@ const H = {
   nivel: el => { form[el.dataset.grp] = el.dataset.v; form.manual = false; pintarMesa(); },
   cuadManual: el => { form.cuad = el.dataset.v; form.manual = form.cuad !== sugerir(form.u, form.i); pintarMesa(); },
   mesaOk: () => mesaOk(),
+  avModo: el => { form.av.modo = el.dataset.v; pintarAviso(); },
+  avA: el => { form.av.a = el.dataset.v; form.av.tocado = true; pintarAviso(); },
   mesaArch: async () => { if (!confirm('¿Archivar esta idea? Queda guardada en el Archivo.')) return; if (await enviar('editarTema', { id: form.id, datos: { etapa: 'Archivada' } }, 'Idea archivada')) cerrarModal(); },
   setAv: el => { form.avance = el.dataset.v; document.querySelectorAll('#segAv button').forEach(b => b.classList.toggle('on', b.dataset.v === form.avance)); },
   guardarDet: async () => {
@@ -805,6 +882,7 @@ document.addEventListener('click', e => {
   const f = H[el.dataset.act];
   if (f) { if (el.tagName !== 'INPUT') e.preventDefault(); f(el); }
 });
+['input', 'change'].forEach(ev => document.addEventListener(ev, e => { if (e.target.id === 'avF' || e.target.id === 'avH') pintarAviso(); }));
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && modalAbierto()) cerrarModal();
   if (e.key === 'Enter' && e.target.id === 'agTema') H.agAlta();
@@ -830,10 +908,10 @@ const Demo = (() => {
   const ahora = () => { const x = new Date(); return fd(x) + ' ' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); };
   let n = 0, na = 0;
   const T = o => Object.assign({ id: 'T-' + String(++n).padStart(4, '0'), fechaCarga: d(-6), tema: '', detalle: '', etapa: 'Tarea', urgencia: 'Mucho', importancia: 'Mucho',
-    cuadrante: 'Hacer ya', inicio: '', limite: '', responsable: '', avance: 'Recibido', comentario: '', validacion: d(-4), actualizacion: d(-1) + ' 10:15' }, o);
+    cuadrante: 'Hacer ya', inicio: '', limite: '', responsable: '', avance: 'Recibido', comentario: '', validacion: d(-4), actualizacion: d(-1) + ' 10:15', recordar: '', avisarA: '' }, o);
   const temas = [
     T({ tema: 'Revisar desvío de costos en la obra en curso', fechaCarga: d(-9), inicio: d(-3), limite: d(4), avance: 'En curso', comentario: 'Pedí a Compras el detalle por partida. Lo vemos el jueves.' }),
-    T({ tema: 'Responder reclamo de cliente por demora de entrega', fechaCarga: d(-1), validacion: d(-1), limite: d(2) }),
+    T({ tema: 'Responder reclamo de cliente por demora de entrega', fechaCarga: d(-1), validacion: d(-1), limite: d(2), recordar: d(1) + ' 09:00', avisarA: 'CEO+COO' }),
     T({ tema: 'Definir proveedor de chapa por aumento de precios', fechaCarga: d(-12), inicio: d(-10), limite: d(-2), avance: 'Bloqueado', comentario: 'Esperando la cotización de dos proveedores.' }),
     T({ tema: 'Plan de capacitación en seguridad para el taller', urgencia: 'Algo', cuadrante: 'Programar', inicio: d(7), limite: d(35), avance: 'Aceptado' }),
     T({ tema: 'Ordenar y señalizar el pañol central', urgencia: 'Poco', cuadrante: 'Programar', fechaCarga: d(-15), inicio: d(-10), limite: d(20), avance: 'En curso' }),
@@ -843,7 +921,7 @@ const Demo = (() => {
     T({ tema: 'Cambiar el proveedor de agua del comedor', urgencia: 'Poco', importancia: 'Poco', cuadrante: 'No es de Dirección' }),
     T({ tema: 'Firmar contrato con cliente nuevo', fechaCarga: d(-25), inicio: d(-20), limite: d(-12), avance: 'Cerrado', comentario: 'Firmado.' }),
     T({ tema: 'Evaluar compra de una segunda plegadora', detalle: 'Ver si conviene comprar o tercerizar.', fechaCarga: d(-4), etapa: 'Idea', urgencia: '', importancia: '', cuadrante: '', avance: '', validacion: '' }),
-    T({ tema: 'Visitar la feria de la construcción', fechaCarga: d(-2), etapa: 'Idea', urgencia: '', importancia: '', cuadrante: '', avance: '', validacion: '' }),
+    T({ tema: 'Visitar la feria de la construcción', fechaCarga: d(-2), recordar: d(3) + ' 18:00', avisarA: 'CEO', etapa: 'Idea', urgencia: '', importancia: '', cuadrante: '', avance: '', validacion: '' }),
     T({ tema: 'Video institucional de la planta', fechaCarga: d(0), etapa: 'Idea', urgencia: '', importancia: '', cuadrante: '', avance: '', validacion: '' }),
     T({ tema: 'Cambiar el diseño de los cascos', fechaCarga: d(-20), etapa: 'Archivada', urgencia: '', importancia: '', cuadrante: '', avance: '', validacion: '' })
   ];
@@ -856,14 +934,15 @@ const Demo = (() => {
   const copia = o => JSON.parse(JSON.stringify(o));
   return {
     get(pin) {
-      const rol = pin === '1111' ? 'CEO' : pin === '2222' ? 'COO' : null;
+      const rol = pin === '1111' ? 'CEO' : pin === '2222' ? 'COO' : pin === '3333' ? 'AUDITORA' : null;
       if (!rol) return Promise.reject(new Error('PIN incorrecto'));
       return Promise.resolve({ rol, hoy: d(0), semaforo: { amarillo: 10, rojo: 15 }, temas: copia(temas), agenda: copia(agenda) });
     },
     post(rol, accion, x) {
       try {
+        if (rol === 'AUDITORA') throw new Error('El acceso de auditoría es de solo lectura');
         if (accion === 'nuevaIdea') {
-          temas.push(T({ tema: x.datos.tema, detalle: x.datos.detalle || '', fechaCarga: x.datos.fechaCarga || d(0), etapa: 'Idea', urgencia: '', importancia: '', cuadrante: '', avance: '', validacion: '', actualizacion: ahora() }));
+          temas.push(T({ tema: x.datos.tema, detalle: x.datos.detalle || '', fechaCarga: x.datos.fechaCarga || d(0), recordar: x.datos.recordar || '', avisarA: x.datos.avisarA || '', etapa: 'Idea', urgencia: '', importancia: '', cuadrante: '', avance: '', validacion: '', actualizacion: ahora() }));
         } else if (accion === 'editarTema') {
           const t = temas.find(z => z.id === x.id); if (!t) throw new Error('No encuentro el tema');
           Object.keys(x.datos).forEach(k => {
