@@ -86,6 +86,17 @@ button.kpi:hover{border-color:var(--azul)}
 .chip.bloq{background:#fde3e3;color:#a41c1c}
 .chip.reas{background:#efe6fb;color:#5b2d9c}
 .reas-t{color:#5b2d9c}
+.chip.val{background:#fff1cf;color:#865600;border:1px solid #f0c66b}
+.orig{text-decoration:line-through;color:#8a93a3;font-weight:400}
+.hist{margin:0;padding:12px 14px 12px 32px;background:#f6f8fb;border-radius:12px;font-size:.92rem;color:var(--gris)}
+.hist li{margin-bottom:6px}
+.aviso-v{margin-top:18px;background:#fde3e3;color:#a41c1c;border-radius:14px;padding:12px 16px;font-weight:700}
+.aviso .btn{margin-top:10px;min-height:48px}
+.g-orig{position:absolute;top:8px;bottom:8px;width:0;border-left:3px dashed #5b2d9c;z-index:2}
+.ley i.orig-i{width:0;border-left:3px dashed #5b2d9c;border-radius:0}
+.reprog-box{border:2px solid #d9c6f3;background:#faf7fe;border-radius:16px;padding:14px 16px;margin-bottom:16px}
+.reprog-box .t{font-weight:700;font-size:1.05rem}
+.reprog-box .acciones{margin-top:12px}
 .vencida{color:var(--bad);font-weight:700}
 .vacio{color:var(--gris);font-style:italic;padding:10px 6px}
 
@@ -326,7 +337,12 @@ const ideas = () => S.temas.filter(t => t.etapa === 'Idea');
 const tareas = () => S.temas.filter(t => t.etapa === 'Tarea');
 const abiertas = () => tareas().filter(t => t.avance !== 'Cerrado');
 const enTema = t => ['Aceptado', 'En curso', 'Bloqueado', 'Cerrado'].indexOf(t.avance) >= 0;
-const vencida = t => { const l = pd(t.limite); return !!l && l < hoyD() && t.avance !== 'Cerrado' && t.etapa === 'Tarea'; };
+const iniEf = t => t.inicioOp || t.inicio;   // fecha que vale hoy: la del COO si reprogramó
+const limEf = t => t.limiteOp || t.limite;
+const reprogramada = t => !!(t.inicioOp || t.limiteOp);
+const porValidar = () => abiertas().filter(t => t.reprogMesa === 'Sí');
+const histLineas = t => String(t.reprogHist || '').split('\n').filter(Boolean);
+const vencida = t => { const l = pd(limEf(t)); return !!l && l < hoyD() && t.avance !== 'Cerrado' && t.etapa === 'Tarea'; };
 
 /* ---------- Comunicación con la planilla ---------- */
 async function apiGet(pin) {
@@ -448,7 +464,7 @@ function indicadores() {
   const txt = { verde: 'Ritmo normal', amarillo: 'Atención: se está cargando', rojo: 'Saturación' }[nivel];
   const ab = abiertas();
   const porQ = CUADS.map(c => `<span><i style="background:${c.c}"></i>${ab.filter(t => t.cuadrante === c.k).length}</span>`).join('');
-  const ni = ideas().length;
+  const ni = ideas().length, pv = porValidar().length;
   return `<section class="kpis">
     <button class="kpi hacer" data-act="tab" data-v="matriz">
       <span class="luz ${nivel}" style="background:${col}"></span>
@@ -460,8 +476,8 @@ function indicadores() {
       <span><div class="lbl">Frentes abiertos</div><div class="mini">${porQ}</div></span>
     </button>
     <button class="kpi" data-act="tab" data-v="ideas">
-      <span class="num" style="color:${ni ? 'var(--q3)' : 'inherit'}">${ni}</span>
-      <span><div class="lbl">Ideas esperando Mesa</div><div class="sub">${ni ? 'Se tratan en la reunión' : 'Bandeja al día'}</div></span>
+      <span class="num" style="color:${ni + pv ? 'var(--q3)' : 'inherit'}">${ni + pv}</span>
+      <span><div class="lbl">Esperando la Mesa</div><div class="sub">${pv ? ni + (ni === 1 ? ' idea · ' : ' ideas · ') + pv + (pv === 1 ? ' fecha a validar' : ' fechas a validar') : ni ? 'Se tratan en la reunión' : 'Bandeja al día'}</div></span>
     </button>
   </section>`;
 }
@@ -473,7 +489,7 @@ function alarma() {
 }
 
 function pestanas() {
-  const ni = ideas().length;
+  const ni = ideas().length + porValidar().length;
   const na = S.agenda.filter(a => a.estado !== 'Tratado').length;
   const t = [['matriz', 'Matriz', 0], ['ideas', 'Ideas', ni], ['gantt', 'Gantt', 0], ['agenda', 'Agenda COO', na], ['archivo', 'Archivo', 0]];
   return `<nav class="tabs">${t.map(([k, l, b]) =>
@@ -493,11 +509,17 @@ function card(t) {
   const v = vencida(t);
   return `<button class="card" style="--c:${colorCuad(t.cuadrante)}" data-act="ver" data-id="${esc(t.id)}">
     <div class="t">${esc(t.tema)}</div>
-    <div class="meta">${chipCoo(t)}${chipAvance(t)}${chipRec(t)}
+    <div class="meta">${chipCoo(t)}${chipAvance(t)}${chipReprog(t)}${chipRec(t)}
       <span>Abierto ${haceTxt(t.fechaCarga)}</span>
-      ${t.limite ? `<span class="${v ? 'vencida' : ''}">${v ? '⚠ Vencida · ' : 'Límite '}${fmt(t.limite)}</span>` : ''}
+      ${limEf(t) ? `<span class="${v ? 'vencida' : ''}">${v ? '⚠ Vencida · ' : 'Límite '}${fmt(limEf(t))}${reprogramada(t) && t.limite && t.limite !== limEf(t) ? ` <span class="orig">${fcorta(t.limite)}</span>` : ''}</span>` : ''}
       ${respTxt(t)}
     </div></button>`;
+}
+function chipReprog(t) {
+  let h = '';
+  if (reprogramada(t)) h += `<span class="chip reas">📅 Reprogramada${t.reprog > 1 ? ' ×' + t.reprog : ''}</span>`;
+  if (t.reprogMesa === 'Sí' && t.avance !== 'Cerrado') h += '<span class="chip val">Validar en Mesa</span>';
+  return h;
 }
 function reasignado(t) { return !!t.responsableOp && t.responsableOp !== t.responsable; }
 function respTxt(t) {
@@ -505,7 +527,7 @@ function respTxt(t) {
   return t.responsable ? `<span>→ ${esc(t.responsable)}</span>` : '';
 }
 function ordenar(l) {
-  return l.slice().sort((a, b) => (a.limite || '9999').localeCompare(b.limite || '9999') || (a.fechaCarga || '').localeCompare(b.fechaCarga || ''));
+  return l.slice().sort((a, b) => (limEf(a) || '9999').localeCompare(limEf(b) || '9999') || (a.fechaCarga || '').localeCompare(b.fechaCarga || ''));
 }
 
 /* ---------- Vistas ---------- */
@@ -522,9 +544,28 @@ function vistaMatriz() {
     }).join('')}</div>`;
 }
 
+function bloqueValidar() {
+  const l = porValidar();
+  if (!l.length) return '';
+  return `<section class="panel" style="margin-bottom:16px">
+    <h2 class="tit">Reprogramaciones para validar <span class="cnt-s" style="background:#5b2d9c">${l.length}</span></h2>
+    <p class="ayuda">Garay corrió las fechas más de una vez. Se valida en la Mesa: aceptar las nuevas fechas o fijar otras.</p>
+    ${l.map(t => {
+      const ult = histLineas(t).filter(x => x.indexOf('COO reprogramó') >= 0).pop() || '';
+      const mot = ult.indexOf('Motivo: ') >= 0 ? ult.slice(ult.indexOf('Motivo: ') + 8) : '';
+      return `<div class="reprog-box">
+        <div class="t">${esc(t.tema)}</div>
+        <div class="meta"><span>CEO: <span class="orig">${fmt(t.limite)}</span> → COO: <b>${fmt(limEf(t))}</b></span><span class="chip reas">${t.reprog} reprogramaciones</span></div>
+        ${mot ? `<div class="det" style="margin-top:6px">Último motivo: ${esc(mot)}</div>` : ''}
+        <div class="acciones">${S.rol === 'CEO' ? `<button class="btn pri" data-act="aceptarReprog" data-id="${esc(t.id)}">✔ Aceptar nuevas fechas</button><button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">✏️ Fijar otras</button>` : ''}<button class="btn sec" data-act="ver" data-id="${esc(t.id)}">Ver detalle</button></div>
+      </div>`;
+    }).join('')}
+  </section>`;
+}
+
 function vistaIdeas() {
   const l = ideas().sort((a, b) => (a.fechaCarga || '').localeCompare(b.fechaCarga || ''));
-  return `<section class="panel">
+  return bloqueValidar() + `<section class="panel">
     <h2 class="tit">Ideas que esperan la Mesa <span class="cnt-s">${l.length}</span></h2>
     <p class="ayuda">Se anotan en cualquier momento. En la reunión CEO–COO se decide si cada una pasa a tarea o se archiva.</p>
     <div class="ideas">${l.length ? l.map(t => {
@@ -541,19 +582,19 @@ function vistaIdeas() {
 
 function vistaGantt() {
   const ts = tareas().filter(t => S.verCerradas || t.avance !== 'Cerrado');
-  const con = ts.filter(t => t.inicio || t.limite).sort((a, b) => (a.inicio || a.limite).localeCompare(b.inicio || b.limite));
-  const sin = ts.filter(t => !t.inicio && !t.limite);
+  const con = ts.filter(t => iniEf(t) || limEf(t)).sort((a, b) => (a.inicio || a.limite).localeCompare(b.inicio || b.limite));
+  const sin = ts.filter(t => !iniEf(t) && !limEf(t));
   const ley = CUADS.map(c => `<span class="ley"><i style="background:${c.c}"></i>${c.k}</span>`).join('');
   let h = `<section class="panel">
     <div class="barra"><h2 class="tit">Gantt de Dirección</h2>
     <label class="tog"><input type="checkbox" data-act="togCerr" ${S.verCerradas ? 'checked' : ''}> Mostrar cerradas</label></div>
-    <div class="leyenda">${ley}<span class="ley"><i class="hoy-i"></i>Hoy</span><span class="ley"><i class="venc-i"></i>Vencida</span></div>`;
+    <div class="leyenda">${ley}<span class="ley"><i class="hoy-i"></i>Hoy</span><span class="ley"><i class="venc-i"></i>Vencida</span>${ts.some(reprogramada) ? '<span class="ley"><i class="orig-i"></i>Límite original del CEO</span>' : ''}</div>`;
   if (!con.length) {
     h += '<div class="vacio">Todavía no hay tareas con fechas. Las fechas se cargan al pasar una idea a tarea en la Mesa.</div>';
   } else {
     const hoy = hoyD();
     let min = hoy, max = hoy;
-    con.forEach(t => { const a = pd(t.inicio || t.limite), b = pd(t.limite || t.inicio); if (a < min) min = a; if (b > max) max = b; });
+    con.forEach(t => { const a = pd(iniEf(t) || limEf(t)), b = pd(limEf(t) || iniEf(t)); if (a < min) min = a; if (b > max) max = b; const o = pd(t.limite); if (o && o < min) min = o; if (o && o > max) max = o; });
     let start = addD(min, -4); start = addD(start, -((start.getDay() + 6) % 7));
     let end = addD(max, 7); end = addD(end, 6 - ((end.getDay() + 6) % 7));
     if (dif(start, end) < 34) end = addD(start, 34);
@@ -580,20 +621,21 @@ function vistaGantt() {
     const filas = con.map(t => {
       const c = colorCuad(t.cuadrante), cerr = t.avance === 'Cerrado', v = vencida(t);
       let bar;
-      if (t.inicio && t.limite) {
-        const a = pd(t.inicio), b = pd(t.limite), l = dif(start, a) * dw, w = Math.max((dif(a, b) + 1) * dw, dw);
+      if (iniEf(t) && limEf(t)) {
+        const a = pd(iniEf(t)), b = pd(limEf(t)), l = dif(start, a) * dw, w = Math.max((dif(a, b) + 1) * dw, dw);
         const nDias = dif(a, b) + 1;
-        const lbl = t.inicio === t.limite ? fcorta(t.inicio) : fcorta(t.inicio) + ' → ' + fcorta(t.limite);
-        const tip = fmt(t.inicio) + ' → ' + fmt(t.limite) + ' (' + nDias + (nDias === 1 ? ' día)' : ' días)');
+        const lbl = iniEf(t) === limEf(t) ? fcorta(iniEf(t)) : fcorta(iniEf(t)) + ' → ' + fcorta(limEf(t));
+        const tip = fmt(iniEf(t)) + ' → ' + fmt(limEf(t)) + ' (' + nDias + (nDias === 1 ? ' día)' : ' días)');
         const entra = w >= lbl.length * 8 + 22;
         bar = `<div class="g-bar ${v ? 'venc' : ''} ${cerr ? 'cerr' : ''}" style="left:${l}px;width:${w}px;--c:${c}" title="${esc(tip)}">${entra ? esc(lbl) : ''}</div>`
             + (entra ? '' : `<span class="g-lbl" style="left:${l + w + 10}px">${esc(lbl)}</span>`);
       } else {
-        const d = pd(t.limite || t.inicio), l = dif(start, d) * dw + dw / 2 - 12;
-        const et = (t.limite ? 'Límite ' : 'Arranque ') + fcorta(t.limite || t.inicio);
+        const d = pd(limEf(t) || iniEf(t)), l = dif(start, d) * dw + dw / 2 - 12;
+        const et = (limEf(t) ? 'Límite ' : 'Arranque ') + fcorta(limEf(t) || iniEf(t));
         bar = `<div class="g-hito ${v ? 'venc' : ''}" style="left:${l}px;--c:${c}" title="${esc(et)}"></div><span class="g-lbl" style="left:${l + 32}px">${esc(et)}</span>`;
       }
-      return `<div class="g-row"><button class="g-name" data-act="ver" data-id="${esc(t.id)}" style="--c:${c}"><span>${esc(t.tema)}</span><small>${esc(t.cuadrante)} · ${esc(t.avance || '')}${v ? ' · <b class="vencida">Vencida</b>' : ''}</small></button><div class="g-track" style="width:${W}px">${bar}</div></div>`;
+      if (reprogramada(t) && t.limite && t.limite !== limEf(t)) bar += `<div class="g-orig" style="left:${dif(start, pd(t.limite)) * dw + dw / 2 - 1}px" title="Límite original del CEO: ${fmt(t.limite)}"></div>`;
+      return `<div class="g-row"><button class="g-name" data-act="ver" data-id="${esc(t.id)}" style="--c:${c}"><span>${esc(t.tema)}</span><small>${esc(t.cuadrante)} · ${esc(t.avance || '')}${reprogramada(t) ? ' · Reprogramada' : ''}${v ? ' · <b class="vencida">Vencida</b>' : ''}</small></button><div class="g-track" style="width:${W}px">${bar}</div></div>`;
     }).join('');
     h += `<div class="gantt"><div class="g-scroll" id="gScroll"><div style="width:calc(var(--nw) + ${W}px)">
       <div class="g-row g-head"><div class="g-name g-hn">Tema</div><div class="g-track" style="width:${W}px">${meses}${dias}${tagHoy}</div></div>
@@ -703,7 +745,10 @@ function abrirDetalle(id) {
       <div><dt>Anotado</dt><dd>${fmt(t.fechaCarga)} · ${haceTxt(t.fechaCarga)}</dd></div>
       <div><dt>Validado en Mesa</dt><dd>${fmt(t.validacion)}</dd></div>
       <div><dt>Urgencia / Importancia</dt><dd>${esc(t.urgencia || '—')} / ${esc(t.importancia || '—')}</dd></div>
-      <div><dt>Arranque → Límite</dt><dd class="${vencida(t) ? 'vencida' : ''}">${fmt(t.inicio)} → ${fmt(t.limite)}</dd></div>
+      ${reprogramada(t)
+        ? `<div><dt>Fechas del CEO</dt><dd><span class="orig">${fmt(t.inicio)} → ${fmt(t.limite)}</span></dd></div>
+           <div><dt>Reprogramado por el COO${t.reprog > 1 ? ' · ' + t.reprog + ' veces' : ''}</dt><dd class="${vencida(t) ? 'vencida' : 'reas-t'}">${fmt(iniEf(t))} → ${fmt(limEf(t))}</dd></div>`
+        : `<div><dt>Arranque → Límite</dt><dd class="${vencida(t) ? 'vencida' : ''}">${fmt(t.inicio)} → ${fmt(t.limite)}</dd></div>`}
       ${t.responsable ? `<div><dt>Responsable (definió el CEO)</dt><dd>${esc(t.responsable)}</dd></div>` : ''}
       ${reasignado(t) ? `<div><dt>Lo hace en la práctica (COO)</dt><dd class="reas-t">${esc(t.responsableOp)} · Reasignado</dd></div>` : ''}
       ${chipRec(t) ? `<div><dt>Recordatorio</dt><dd>🔔 ${esc(diaLargo(t.recordar))} · ${esc(t.recordar.slice(11, 16))}${t.avisarA === 'CEO+COO' ? ' · a los dos' : ''}</dd></div>` : ''}
@@ -715,9 +760,13 @@ function abrirDetalle(id) {
       <label class="l" for="fCom">Comentario del COO</label>
       ${coo ? `<textarea class="in" id="fCom" placeholder="¿Cómo viene este tema?">${esc(t.comentario)}</textarea>`
             : `<div class="leer">${t.comentario ? esc(t.comentario) : '<em>Sin comentarios todavía</em>'}</div>`}
+      ${histLineas(t).length ? `<label class="l">Historial de fechas</label><ul class="hist">${histLineas(t).map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${coo && vencida(t) ? `<div class="aviso-v">⚠ Venció el ${fmt(limEf(t))}. Si cambió el plazo, tocá "Reprogramar fechas".</div>` : ''}
       ${coo && t.cuadrante === 'Delegar' ? `<label class="l" for="fResp">¿Quién lo hace en la práctica? <span class="nota">(solo si no es ${esc(t.responsable || 'el definido por el CEO')})</span></label><input class="in" id="fResp" value="${esc(t.responsableOp)}" placeholder="Dejalo vacío si lo hace ${esc(t.responsable || 'quien definió el CEO')}">` : ''}` : ''}
     <div class="acciones">
       ${coo && t.etapa === 'Tarea' ? '<button class="btn pri" data-act="guardarDet">Guardar avance</button>' : ''}
+      ${coo && t.etapa === 'Tarea' && t.avance !== 'Cerrado' ? `<button class="btn sec" data-act="reprog" data-id="${esc(t.id)}">📅 Reprogramar fechas</button>` : ''}
+      ${S.rol === 'CEO' && t.reprogMesa === 'Sí' && t.avance !== 'Cerrado' ? `<button class="btn sec" data-act="aceptarReprog" data-id="${esc(t.id)}">✔ Aceptar nuevas fechas</button>` : ''}
       ${S.rol === 'CEO' ? (t.etapa === 'Tarea' ? `<button class="btn sec" data-act="mesa" data-id="${esc(t.id)}">✏️ Editar</button><button class="btn peligro" data-act="archivar" data-id="${esc(t.id)}">Archivar</button>`
                                     : `<button class="btn sec" data-act="reactivar" data-id="${esc(t.id)}">Volver a Ideas</button>`) : ''}
       <button class="btn volver" data-act="cerrarModal">← Volver</button>
@@ -746,6 +795,7 @@ function abrirMesa(id) {
       <div><label class="l" for="mIni" id="lIni">Fecha de arranque</label><input type="date" class="in" id="mIni" value="${esc(t.inicio)}"></div>
       <div><label class="l" for="mLim" id="lLim">Fecha límite</label><input type="date" class="in" id="mLim" value="${esc(t.limite)}"></div>
     </div>
+    ${reprogramada(t) ? `<div class="aviso">Garay las reprogramó a <b>${fmt(iniEf(t))} → ${fmt(limEf(t))}</b>${t.reprog > 1 ? ' (' + t.reprog + ' veces)' : ''}. Si cambiás las fechas acá, pasan a ser las oficiales.<br><button type="button" class="btn sec" data-act="usarReprog">Usar las fechas de Garay</button></div>` : ''}
     <div id="bResp"><label class="l" for="mResp">¿A quién se delega?</label><input class="in" id="mResp" value="${esc(t.responsable)}" placeholder="Nombre o área"></div>
     ${bloqueAviso()}
     <div id="mErr" class="err"></div>
@@ -789,6 +839,46 @@ async function mesaOk() {
     cuadrante: form.cuad, inicio: ini, limite: lim, responsable: $('#mResp').value.trim(),
     recordar: r, avisarA: r ? avisarA() : ''
   } }, form.esIdea ? 'Pasó a tarea: ' + form.cuad : 'Cambios guardados');
+  if (ok) cerrarModal();
+}
+
+/* ---------- Reprogramar fechas (COO) ---------- */
+function abrirReprog(id) {
+  if (S.rol !== 'COO') return;
+  const t = S.temas.find(x => x.id === id); if (!t) return;
+  const l = pd(limEf(t));
+  form = { id, base: fd(l && l > hoyD() ? l : hoyD()) };
+  const n = (t.reprog || 0) + 1;
+  modal(`<span class="pill" style="--c:${colorCuad(t.cuadrante)}">${esc(t.cuadrante)}</span>
+    <h3>Reprogramar fechas</h3>
+    <div class="det" style="font-weight:700;color:var(--texto)">${esc(t.tema)}</div>
+    <dl class="datos">
+      <div><dt>Fechas que definió el CEO</dt><dd>${fmt(t.inicio)} → ${fmt(t.limite)}</dd></div>
+      ${reprogramada(t) ? `<div><dt>Fechas actuales (ya reprogramadas)</dt><dd class="reas-t">${fmt(iniEf(t))} → ${fmt(limEf(t))}</dd></div>` : ''}
+    </dl>
+    <label class="l">Correr el límite</label>
+    <div class="seg">${[[7, '+1 semana'], [14, '+2 semanas'], [30, '+1 mes']].map(([d, x]) => `<button type="button" data-act="rCorrer" data-v="${d}">${x}</button>`).join('')}</div>
+    <div class="dos">
+      <div><label class="l" for="rIni">Nuevo arranque <span class="nota">(opcional)</span></label><input type="date" class="in" id="rIni" value="${esc(iniEf(t))}"></div>
+      <div><label class="l" for="rLim">Nuevo límite</label><input type="date" class="in" id="rLim" value="${esc(limEf(t))}" min="${esc(S.hoy)}"></div>
+    </div>
+    <label class="l" for="rMot">¿Por qué se corre? <span class="nota">(obligatorio · lo ve José)</span></label>
+    <textarea class="in" id="rMot" style="min-height:80px" placeholder="Ej.: el proveedor entrega la chapa el 18"></textarea>
+    ${n >= 2 ? `<div class="aviso">Es la <b>${n}ª reprogramación</b>: el tema queda marcado para que José lo valide en la próxima Mesa.</div>` : ''}
+    <div id="mErr" class="err"></div>
+    <div class="acciones"><button class="btn pri" data-act="reprogOk">Guardar nuevas fechas</button><button class="btn volver" data-act="ver" data-id="${esc(t.id)}">← Volver</button></div>`);
+}
+async function reprogOk() {
+  const err = $('#mErr'); err.textContent = '';
+  const t = S.temas.find(x => x.id === form.id); if (!t) return;
+  const ini = $('#rIni').value, lim = $('#rLim').value, motivo = $('#rMot').value.trim();
+  if (!lim) return (err.textContent = 'Elegí la nueva fecha límite.');
+  if (lim < S.hoy) return (err.textContent = 'El nuevo límite no puede ser anterior a hoy.');
+  if ((ini || t.inicio) && (ini || t.inicio) > lim) return (err.textContent = 'La fecha de arranque no puede ser posterior al límite.');
+  if (ini === (iniEf(t) || '') && lim === (limEf(t) || '')) return (err.textContent = 'Las fechas son las mismas: cambiá al menos una.');
+  if (!motivo) { $('#rMot').focus(); return (err.textContent = 'Contá brevemente por qué se corre: José lo ve.'); }
+  const ok = await enviar('reprogramar', { id: form.id, datos: { inicio: ini, limite: lim, motivo } },
+    'Reprogramada: nuevo límite ' + fmt(lim) + ((t.reprog || 0) + 1 >= 2 ? ' · queda para validar en la Mesa' : ''));
   if (ok) cerrarModal();
 }
 
@@ -872,6 +962,11 @@ const H = {
   nivel: el => { form[el.dataset.grp] = el.dataset.v; form.manual = false; pintarMesa(); },
   cuadManual: el => { form.cuad = el.dataset.v; form.manual = form.cuad !== sugerir(form.u, form.i); pintarMesa(); },
   mesaOk: () => mesaOk(),
+  reprog: el => abrirReprog(el.dataset.id),
+  reprogOk: () => reprogOk(),
+  rCorrer: el => { $('#rLim').value = fd(addD(pd(form.base), +el.dataset.v)); document.querySelectorAll('[data-act=rCorrer]').forEach(b => b.classList.toggle('on', b === el)); },
+  aceptarReprog: async el => { if (await enviar('editarTema', { id: el.dataset.id, datos: { reprogMesa: '' } }, 'Reprogramación aceptada')) cerrarModal(); },
+  usarReprog: () => { const t = S.temas.find(x => x.id === form.id); if (!t) return; $('#mIni').value = iniEf(t) || ''; $('#mLim').value = limEf(t) || ''; toast('Cargué las fechas de Garay: guardá para dejarlas como oficiales'); },
   avModo: el => { form.av.modo = el.dataset.v; pintarAviso(); },
   avA: el => { form.av.a = el.dataset.v; form.av.tocado = true; pintarAviso(); },
   mesaArch: async () => { if (!confirm('¿Archivar esta idea? Queda guardada en el Archivo.')) return; if (await enviar('editarTema', { id: form.id, datos: { etapa: 'Archivada' } }, 'Idea archivada')) cerrarModal(); },
@@ -918,13 +1013,19 @@ const Demo = (() => {
   const ahora = () => { const x = new Date(); return fd(x) + ' ' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); };
   let n = 0, na = 0;
   const T = o => Object.assign({ id: 'T-' + String(++n).padStart(4, '0'), fechaCarga: d(-6), tema: '', detalle: '', etapa: 'Tarea', urgencia: 'Mucho', importancia: 'Mucho',
-    cuadrante: 'Hacer ya', inicio: '', limite: '', responsable: '', avance: 'Recibido', comentario: '', validacion: d(-4), actualizacion: d(-1) + ' 10:15', recordar: '', avisarA: '' }, o);
+    cuadrante: 'Hacer ya', inicio: '', limite: '', responsable: '', avance: 'Recibido', comentario: '', validacion: d(-4), actualizacion: d(-1) + ' 10:15', recordar: '', avisarA: '', inicioOp: '', limiteOp: '', reprog: 0, reprogMesa: '', reprogHist: '' }, o);
+  const dm = s => s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '—';
+  const rangoD = (a, b) => a && a !== b ? dm(a) + ' a ' + dm(b) : dm(b);
+  const hist = (t, txt) => { const x = new Date(); const l = String(x.getDate()).padStart(2, '0') + '/' + String(x.getMonth() + 1).padStart(2, '0') + '/' + x.getFullYear() + ' · ' + txt; t.reprogHist = t.reprogHist ? t.reprogHist + '\n' + l : l; };
   const temas = [
     T({ tema: 'Revisar desvío de costos en la obra en curso', fechaCarga: d(-9), inicio: d(-3), limite: d(4), avance: 'En curso', comentario: 'Pedí a Compras el detalle por partida. Lo vemos el jueves.' }),
     T({ tema: 'Responder reclamo de cliente por demora de entrega', fechaCarga: d(-1), validacion: d(-1), limite: d(2), recordar: d(1) + ' 09:00', avisarA: 'CEO+COO' }),
     T({ tema: 'Definir proveedor de chapa por aumento de precios', fechaCarga: d(-12), inicio: d(-10), limite: d(-2), avance: 'Bloqueado', comentario: 'Esperando la cotización de dos proveedores.' }),
     T({ tema: 'Plan de capacitación en seguridad para el taller', urgencia: 'Algo', cuadrante: 'Programar', inicio: d(7), limite: d(35), avance: 'Aceptado' }),
     T({ tema: 'Ordenar y señalizar el pañol central', urgencia: 'Poco', cuadrante: 'Programar', fechaCarga: d(-15), inicio: d(-10), limite: d(20), avance: 'En curso' }),
+    T({ tema: 'Instalar extractores en el sector Pintura', urgencia: 'Algo', cuadrante: 'Programar', fechaCarga: d(-30), inicio: d(-25), limite: d(-8), inicioOp: d(-25), limiteOp: d(9), reprog: 2, reprogMesa: 'Sí', avance: 'En curso',
+      reprogHist: fd(addD(h, -8)).split('-').reverse().join('/') + ' · COO reprogramó (1ª): ' + dm(d(-25)) + ' a ' + dm(d(-8)) + ' → ' + dm(d(-25)) + ' a ' + dm(d(-1)) + ' · Motivo: Falta el ducto, lo trae el proveedor la semana que viene\n' +
+                  fd(addD(h, -1)).split('-').reverse().join('/') + ' · COO reprogramó (2ª): ' + dm(d(-25)) + ' a ' + dm(d(-1)) + ' → ' + dm(d(-25)) + ' a ' + dm(d(9)) + ' · Motivo: El electricista está en la obra de Oberá hasta el lunes' }),
     T({ tema: 'Presupuesto 2027 por unidad de negocio', urgencia: 'Algo', cuadrante: 'Programar', inicio: d(14), limite: d(60) }),
     T({ tema: 'Renovar seguros de los vehículos', importancia: 'Poco', cuadrante: 'Delegar', responsable: 'Administración', limite: d(10), avance: 'Aceptado' }),
     T({ tema: 'Actualizar legajos del personal', importancia: 'Poco', cuadrante: 'Delegar', responsable: 'RRHH', avance: 'En curso' }),
@@ -955,6 +1056,7 @@ const Demo = (() => {
           temas.push(T({ tema: x.datos.tema, detalle: x.datos.detalle || '', fechaCarga: x.datos.fechaCarga || d(0), recordar: x.datos.recordar || '', avisarA: x.datos.avisarA || '', etapa: 'Idea', urgencia: '', importancia: '', cuadrante: '', avance: '', validacion: '', actualizacion: ahora() }));
         } else if (accion === 'editarTema') {
           const t = temas.find(z => z.id === x.id); if (!t) throw new Error('No encuentro el tema');
+          const antes = { inicio: t.inicio, limite: t.limite, reprogMesa: t.reprogMesa };
           Object.keys(x.datos).forEach(k => {
             if ((k === 'avance' || k === 'comentario') && rol !== 'COO') throw new Error('Solo el COO puede cambiar el avance');
             if (k === 'responsableOp' && rol !== 'COO') throw new Error('Solo el COO puede reasignar');
@@ -962,6 +1064,22 @@ const Demo = (() => {
             t[k] = x.datos[k] == null ? '' : x.datos[k];
           });
           if (t.etapa === 'Tarea') { if (!t.validacion) t.validacion = d(0); if (!t.avance) t.avance = 'Recibido'; }
+          if (rol === 'CEO' && (t.inicioOp || t.limiteOp) && (t.inicio !== antes.inicio || t.limite !== antes.limite)) {
+            t.inicioOp = ''; t.limiteOp = ''; t.reprogMesa = ''; hist(t, 'CEO fijó nuevas fechas: ' + rangoD(t.inicio, t.limite));
+          } else if (antes.reprogMesa && !t.reprogMesa) hist(t, 'CEO aceptó la reprogramación en la Mesa');
+          t.actualizacion = ahora();
+        } else if (accion === 'reprogramar') {
+          if (rol !== 'COO') throw new Error('Solo el COO puede reprogramar');
+          const t = temas.find(z => z.id === x.id);
+          if (!t || t.etapa !== 'Tarea' || t.avance === 'Cerrado') throw new Error('Solo se reprograman tareas abiertas');
+          const r = x.datos || {};
+          if (!String(r.motivo || '').trim()) throw new Error('Falta el motivo de la reprogramación');
+          if (!r.limite) throw new Error('Falta la nueva fecha límite');
+          const iA = t.inicioOp || t.inicio, lA = t.limiteOp || t.limite;
+          if ((r.inicio || '') === (iA || '') && r.limite === lA) throw new Error('Las fechas son las mismas: no hay nada que reprogramar');
+          t.inicioOp = r.inicio || ''; t.limiteOp = r.limite; t.reprog = (t.reprog || 0) + 1;
+          if (t.reprog >= 2) t.reprogMesa = 'Sí';
+          hist(t, 'COO reprogramó (' + t.reprog + 'ª): ' + rangoD(iA, lA) + ' → ' + rangoD(r.inicio, r.limite) + ' · Motivo: ' + r.motivo.trim());
           t.actualizacion = ahora();
         } else if (accion === 'nuevoAgenda') {
           if (rol !== 'COO') throw new Error('Solo el COO carga temas de agenda');
